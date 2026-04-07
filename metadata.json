@@ -1,0 +1,9 @@
+{
+  "project_type": "fullstack",
+  "prompt": "Construct a FleetReserve Operations Suite supporting offline vehicle fleet scheduling, e-ticket admissions, and auditable multi-role access for a local rental yard or dealership service center.",
+  "frontend_language": "rust",
+  "backend_language": "rust",
+  "frontend_framework": "leptos",
+  "backend_framework": "axum",
+  "database": "sqlite"
+}
