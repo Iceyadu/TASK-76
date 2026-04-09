@@ -1,20 +1,24 @@
-//! API Ticket Tests
-//!
-//! GET /api/tickets/:id
-//!   - Ticket owner -> 200
-//!   - Other customer -> 403
-//!   - MerchantStaff -> 200
-//!
-//! POST /api/tickets/:id/redeem
-//!   - Valid ticket, first redeem -> 200, {redeemed_at}
-//!   - Already redeemed -> 400, "already been redeemed"
-//!   - MerchantStaff+ required -> 403 for Customer
-//!   - CSRF required -> 403 without token
-//!
-//! POST /api/tickets/:id/undo
-//!   - Within 2 min, with reason -> 200
-//!   - Within 2 min, empty reason -> 400, "required"
-//!   - Within 2 min, missing reason -> 400
-//!   - After 2 min -> 400, "expired"
-//!   - Not redeemed -> 400, "not been redeemed"
-//!   - Already undone -> 400, "already been undone"
+use fleetreserve_backend::services::ticket_engine::{generate_ticket, redeem_ticket, undo_redemption};
+use rusqlite::Connection;
+
+fn setup_db() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+    conn.execute_batch(include_str!("../backend/migrations/001_initial_schema.sql")).unwrap();
+    conn.execute("INSERT INTO stores (id, name, location) VALUES ('s1','S','L')", []).unwrap();
+    conn.execute("INSERT INTO users (id, username, password_hash, display_name, role) VALUES ('u1','u1','x','U1','Customer')", []).unwrap();
+    conn.execute("INSERT INTO users (id, username, password_hash, display_name, role) VALUES ('staff-1','staff1','x','S1','MerchantStaff')", []).unwrap();
+    conn.execute(
+        "INSERT INTO reservations (id, asset_type, asset_id, store_id, user_id, start_time, end_time, status) VALUES ('r1','vehicle','v1','s1','u1','2026-05-01T09:00:00','2026-05-01T10:00:00','confirmed')",
+        [],
+    ).unwrap();
+    conn
+}
+
+#[test]
+fn api_ticket_redeem_then_undo() {
+    let conn = setup_db();
+    let ticket = generate_ticket(&conn, "r1", "2000-01-01T00:00:00", "2099-01-01T00:00:00").unwrap();
+    assert!(redeem_ticket(&conn, &ticket.id, "staff-1", "staff1").is_ok());
+    assert!(undo_redemption(&conn, &ticket.id, "staff-1", "staff1", "operator mistake").is_ok());
+}

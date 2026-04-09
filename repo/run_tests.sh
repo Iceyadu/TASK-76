@@ -14,6 +14,12 @@ run_backend_tests() {
   echo ""
   echo "--- Backend Integration Tests ---"
   cargo test --test integration_tests -- --nocapture 2>&1
+  echo ""
+  echo "--- Unit Tests (repo/unit_tests) ---"
+  cargo test --test unit_tests_runner -- --nocapture 2>&1
+  echo ""
+  echo "--- API Tests (repo/API_tests) ---"
+  cargo test --test api_tests_runner -- --nocapture 2>&1
 }
 
 if command -v cargo >/dev/null 2>&1; then
@@ -22,10 +28,10 @@ elif command -v docker >/dev/null 2>&1; then
   echo "(cargo not found; using Docker image rust:bookworm)" >&2
   # Use bash -c (not -lc): login shells on this image drop /usr/local/cargo/bin from PATH.
   docker run --rm \
-    -v "$BACKEND_DIR:/app" \
-    -w /app \
+    -v "$SCRIPT_DIR:/app" \
+    -w /app/backend \
     rust:bookworm \
-    bash -c 'set -euo pipefail; cargo test --lib -- --nocapture; echo ""; echo "--- Backend Integration Tests ---"; cargo test --test integration_tests -- --nocapture' 2>&1
+    bash -c 'set -euo pipefail; cargo test --lib -- --nocapture; echo ""; echo "--- Backend Integration Tests ---"; cargo test --test integration_tests -- --nocapture; echo ""; echo "--- Unit Tests (repo/unit_tests) ---"; cargo test --test unit_tests_runner -- --nocapture; echo ""; echo "--- API Tests (repo/API_tests) ---"; cargo test --test api_tests_runner -- --nocapture' 2>&1
 else
   echo "error: neither 'cargo' nor 'docker' is available." >&2
   echo "  Install Rust: https://rustup.rs" >&2
@@ -35,14 +41,4 @@ fi
 
 cd "$SCRIPT_DIR"
 echo ""
-echo "--- Unit Tests (standalone) ---"
-echo "See unit_tests/ directory for standalone test files."
-echo "These tests reference backend crate internals and are run via the backend test harness."
-echo ""
-
-echo "--- API Tests (standalone) ---"
-echo "See API_tests/ directory for API integration test files."
-echo "These tests require a running backend instance or are run via the backend integration tests."
-echo ""
-
 echo "=== All available tests complete ==="

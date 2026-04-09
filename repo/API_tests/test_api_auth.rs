@@ -1,26 +1,26 @@
-//! API Authentication Tests
-//!
-//! POST /api/auth/login
-//!   - Valid credentials -> 200, returns {token, csrf_token, user}
-//!   - Invalid password -> 401
-//!   - Unknown user -> 401
-//!   - Missing fields -> 400
-//!
-//! GET /api/auth/me
-//!   - With valid token -> 200, returns masked user
-//!   - Without token -> 401
-//!   - With expired token -> 401
-//!
-//! POST /api/admin/recovery-codes
-//!   - As admin -> 200, returns {code, expires_at}
-//!   - As non-admin -> 403
-//!   - For nonexistent user -> 404
-//!
-//! POST /api/auth/reset-password
-//!   - Valid code within 30 min -> 200
-//!   - Expired code -> 400
-//!   - Wrong code -> 400
-//!   - Already-used code -> 400
-//!
-//! POST /api/auth/logout
-//!   - Valid token -> 200, audit entry created
+use fleetreserve_backend::auth::{csrf, password, session};
+
+#[test]
+fn api_auth_password_hash_and_verify() {
+    let hash = password::hash_password("fleetreserve-pass").unwrap();
+    assert!(password::verify_password("fleetreserve-pass", &hash));
+    assert!(!password::verify_password("wrong-pass", &hash));
+}
+
+#[test]
+fn api_auth_token_roundtrip_and_csrf() {
+    let token = session::create_token(
+        "user-1",
+        "alice",
+        "MerchantStaff",
+        Some("store-001"),
+        "test-hmac-secret-32-bytes-minimum!!",
+    );
+    let claims = session::validate_token(&token, "test-hmac-secret-32-bytes-minimum!!").unwrap();
+    assert_eq!(claims.user_id, "user-1");
+    assert_eq!(claims.role, "MerchantStaff");
+
+    let csrf_token = csrf::generate_csrf_token();
+    assert!(csrf::validate_csrf_token(&csrf_token, &csrf_token));
+    assert!(!csrf::validate_csrf_token(&csrf_token, "mismatch"));
+}

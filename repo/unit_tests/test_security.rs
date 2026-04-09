@@ -1,17 +1,18 @@
-//! Security unit tests
-//! Run via: cd backend && cargo test
-//!
-//! Corresponding inline tests:
-//!   backend/src/security/masking.rs::tests
-//!   backend/src/security/encryption.rs::tests
-//!   backend/src/audit/chain.rs::tests
+use fleetreserve_backend::audit::chain::{append_audit_log, verify_chain_integrity};
+use fleetreserve_backend::security::masking::{mask_license_plate, mask_vin};
+use rusqlite::Connection;
 
-// Test: mask_vin - "*************3456" for 17-char VIN
-// Test: mask_license_plate - "*****34" for 7-char plate
-// Test: mask_username - "j***" for "johndoe"
-// Test: encrypt_decrypt_roundtrip - Decrypt(Encrypt(x)) == x
-// Test: ciphertext_not_plaintext - encrypted != original
-// Test: wrong_key_fails - decrypt with different key errors
-// Test: audit_chain_integrity - valid chain passes verification
-// Test: audit_chain_detects_tampering - modified record fails verification
-// Test: hash_chain_links_previous - entry N's previous_hash == entry N-1's current_hash
+#[test]
+fn unit_security_masking() {
+    assert_eq!(mask_vin("1HGCM82633A123456"), "*************3456");
+    assert_eq!(mask_license_plate("ABC1234"), "*****34");
+}
+
+#[test]
+fn unit_security_audit_chain() {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(include_str!("../backend/migrations/001_initial_schema.sql")).unwrap();
+    append_audit_log(&conn, "u1", "alice", "CREATE", "x", "1", &serde_json::json!({})).unwrap();
+    append_audit_log(&conn, "u1", "alice", "UPDATE", "x", "1", &serde_json::json!({"a":1})).unwrap();
+    assert!(verify_chain_integrity(&conn).unwrap());
+}

@@ -1,13 +1,15 @@
-//! Upload validation unit tests
-//! Run via: cd backend && cargo test
-//!
-//! Corresponding inline tests:
-//!   backend/src/services/uploads.rs::tests
+use fleetreserve_backend::services::uploads::validate_upload;
 
-// Test: valid_jpeg_accepted - JPEG magic bytes FF D8 FF pass
-// Test: valid_png_magic_bytes - PNG magic bytes 89 50 4E 47 pass
-// Test: invalid_file_rejected - non-image bytes rejected
-// Test: oversized_file_rejected - >10MB rejected
-// Test: fingerprint_deterministic - same data -> same SHA-256
-// Test: different_data_different_fingerprint
-// Test: duplicate_detection - second upload with same fingerprint detected
+#[test]
+fn unit_uploads_invalid_rejected() {
+    let err = validate_upload(b"not image bytes", "x.txt").unwrap_err();
+    assert!(err.contains("Magic bytes") || err.contains("valid image") || err.contains("too small"));
+}
+
+#[test]
+fn unit_uploads_oversized_rejected() {
+    let mut data = vec![0xFF, 0xD8, 0xFF, 0xE0];
+    data.extend(vec![0u8; 10 * 1024 * 1024 + 1]);
+    let err = validate_upload(&data, "big.jpg").unwrap_err();
+    assert!(err.contains("10 MB"));
+}

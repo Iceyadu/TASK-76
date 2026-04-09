@@ -1,10 +1,16 @@
-//! API Upload Tests
-//!
-//! POST /api/uploads
-//!   - Valid JPEG (magic bytes FF D8 FF) -> 201
-//!   - Valid PNG (magic bytes 89 50 4E 47) -> 201
-//!   - Invalid file type (GIF, PDF, etc.) -> 400, "Magic bytes do not match"
-//!   - File > 10MB -> 400, "exceeds maximum size"
-//!   - Duplicate fingerprint -> 409, "Duplicate file"
-//!   - CSRF required -> 403
-//!   - MerchantStaff+ required -> 403 for Customer
+use fleetreserve_backend::services::uploads::validate_upload;
+
+#[test]
+fn api_upload_rejects_non_image() {
+    let bad = b"not an image payload";
+    let err = validate_upload(bad, "x.txt").unwrap_err();
+    assert!(err.contains("Magic bytes") || err.contains("valid image") || err.contains("too small"));
+}
+
+#[test]
+fn api_upload_rejects_oversized_blob() {
+    let mut big = vec![0xFF, 0xD8, 0xFF, 0xE0];
+    big.extend(vec![0u8; 10 * 1024 * 1024 + 1]);
+    let err = validate_upload(&big, "big.jpg").unwrap_err();
+    assert!(err.contains("10 MB"));
+}

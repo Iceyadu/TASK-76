@@ -1,20 +1,35 @@
-//! API Audit Tests
-//!
-//! GET /api/audit
-//!   - PlatformOps+ required -> 403 for Customer/MerchantStaff
-//!   - Returns recent audit entries
-//!   - Filters by resource_type and resource_id
-//!
-//! Audit chain verification:
-//!   - Each entry's previous_hash matches the prior entry's current_hash
-//!   - Recomputed hash matches stored current_hash
-//!   - Tampered entry breaks chain validation
-//!
-//! Actions that create audit entries:
-//!   - LOGIN, LOGOUT
-//!   - CREATE/UPDATE/DELETE on all resources
-//!   - STATUS_CHANGE on vehicles
-//!   - REDEEM, UNDO on tickets
-//!   - EXPORT
-//!   - BACKUP, RESTORE
-//!   - PERMISSION_CHANGE
+use fleetreserve_backend::audit::chain::{append_audit_log, verify_chain_integrity};
+use rusqlite::Connection;
+
+fn setup_db() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(include_str!("../backend/migrations/001_initial_schema.sql"))
+        .unwrap();
+    conn
+}
+
+#[test]
+fn api_audit_chain_integrity_happy_path() {
+    let conn = setup_db();
+    append_audit_log(
+        &conn,
+        "user-1",
+        "alice",
+        "CREATE",
+        "reservation",
+        "res-1",
+        &serde_json::json!({"k":"v"}),
+    )
+    .unwrap();
+    append_audit_log(
+        &conn,
+        "user-1",
+        "alice",
+        "UPDATE",
+        "reservation",
+        "res-1",
+        &serde_json::json!({"status":"confirmed"}),
+    )
+    .unwrap();
+    assert!(verify_chain_integrity(&conn).unwrap());
+}

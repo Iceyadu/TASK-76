@@ -1,41 +1,30 @@
-//! Reservation engine unit tests
-//! Run via: cd backend && cargo test
-//!
-//! These tests verify:
-//! - Happy path: reservation created with ticket
-//! - Overlapping reservation detected
-//! - Vehicle in-repair conflict
-//! - Expired insurance conflict
-//! - Bay capacity exceeded
-//! - Alternative slot computation returns nearest 2
-//! - Alternate vehicle suggestion
-//! - Optimistic concurrency retry
-//! - Deterministic conflict reasons
-//!
-//! Corresponding inline tests:
-//!   backend/src/services/reservation_engine.rs::tests
+use fleetreserve_backend::models::CreateReservationRequest;
+use fleetreserve_backend::services::reservation_engine::create_reservation;
+use rusqlite::Connection;
 
-// Test: reservation_happy_path
-// Fixture: available vehicle v1, store-001
-// Assertion: result.is_ok(), reservation.status == "confirmed", ticket starts with "FR-"
-// See: backend/src/services/reservation_engine.rs:test_reservation_happy_path
+fn setup_db() -> Connection {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+    conn.execute_batch(include_str!("../backend/migrations/001_initial_schema.sql")).unwrap();
+    conn.execute_batch(include_str!("../backend/migrations/002_seed_data.sql")).unwrap();
+    conn.execute("UPDATE users SET active = 1 WHERE id = 'user-admin-001'", []).unwrap();
+    conn.execute(
+        "INSERT INTO vehicles (id, vin_encrypted, vin_hash, license_plate_encrypted, license_plate_hash, make, model, store_id, status, insurance_expiry, version) VALUES ('v1', 'enc', 'h', 'enc', 'h', 'T', 'V', 'store-001', 'available', '2100-01-01T00:00:00', 1)",
+        [],
+    ).unwrap();
+    conn
+}
 
-// Test: overlapping_reservation_conflict
-// Fixture: existing reservation on v1 9:00-10:00, attempt 9:30-10:30
-// Assertion: result.is_err(), conflict.reasons contains "overlapping_reservation"
-// See: backend/src/services/reservation_engine.rs:test_overlapping_reservation_conflict
-
-// Test: in_repair_conflict
-// Fixture: vehicle v-repair with status "in-repair"
-// Assertion: conflict.reasons contains "in_repair_hold"
-// See: backend/src/services/reservation_engine.rs:test_in_repair_conflict
-
-// Test: alternative_slots_returned
-// Fixture: conflict on v1
-// Assertion: conflict.alternative_slots.len() <= 2, slots within business hours
-// See: backend/src/services/reservation_engine.rs:test_alternative_slots_returned
-
-// Test: alternate_vehicle_suggested
-// Fixture: vehicle v-repair unavailable, v1 and v2 available
-// Assertion: conflict.alternate_assets is not empty
-// See: backend/src/services/reservation_engine.rs:test_alternate_vehicle_suggested
+#[test]
+fn unit_reservation_engine_happy_path() {
+    let conn = setup_db();
+    let req = CreateReservationRequest {
+        asset_type: "vehicle".into(),
+        asset_id: "v1".into(),
+        store_id: "store-001".into(),
+        start_time: "2026-05-01T09:00:00".into(),
+        end_time: "2026-05-01T10:00:00".into(),
+    };
+    let out = create_reservation(&conn, "user-admin-001", "admin", &req).unwrap();
+    assert_eq!(out.reservation.status, "confirmed");
+}
