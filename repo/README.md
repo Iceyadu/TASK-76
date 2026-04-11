@@ -49,8 +49,12 @@ trunk serve
 ```bash
 ./run_tests.sh
 
-# Or individually:
-cd backend && cargo test
+# Or individually (from repo/backend):
+cargo test --lib
+cargo test --test integration_tests
+cargo test --test unit_tests_runner
+cargo test --test api_tests_runner
+cargo test --test http_api_endpoints
 ```
 
 ## Package Structure
@@ -61,8 +65,9 @@ repo/
   backend/           Axum REST API server
   docker-compose.yml Container orchestration
   run_tests.sh       Test runner
-  unit_tests/        Reviewer-facing test references
-  API_tests/         API behavior specifications
+  unit_tests/        Executable unit tests (wired via unit_tests_runner)
+  API_tests/         Executable API-level tests (services/auth; wired via api_tests_runner)
+                     plus HTTP integration tests: backend/tests/http_api_endpoints.rs
 ```
 
 ## Security Summary

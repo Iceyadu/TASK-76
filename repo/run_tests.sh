@@ -20,6 +20,9 @@ run_backend_tests() {
   echo ""
   echo "--- API Tests (repo/API_tests) ---"
   cargo test --test api_tests_runner -- --nocapture 2>&1
+  echo ""
+  echo "--- HTTP API tests (Axum router + axum-test) ---"
+  cargo test --test http_api_endpoints -- --nocapture 2>&1
 }
 
 if command -v cargo >/dev/null 2>&1; then
@@ -31,7 +34,7 @@ elif command -v docker >/dev/null 2>&1; then
     -v "$SCRIPT_DIR:/app" \
     -w /app/backend \
     rust:bookworm \
-    bash -c 'set -euo pipefail; cargo test --lib -- --nocapture; echo ""; echo "--- Backend Integration Tests ---"; cargo test --test integration_tests -- --nocapture; echo ""; echo "--- Unit Tests (repo/unit_tests) ---"; cargo test --test unit_tests_runner -- --nocapture; echo ""; echo "--- API Tests (repo/API_tests) ---"; cargo test --test api_tests_runner -- --nocapture' 2>&1
+    bash -c 'set -euo pipefail; cargo test --lib -- --nocapture; echo ""; echo "--- Backend Integration Tests ---"; cargo test --test integration_tests -- --nocapture; echo ""; echo "--- Unit Tests (repo/unit_tests) ---"; cargo test --test unit_tests_runner -- --nocapture; echo ""; echo "--- API Tests (repo/API_tests) ---"; cargo test --test api_tests_runner -- --nocapture; echo ""; echo "--- HTTP API tests (Axum router + axum-test) ---"; cargo test --test http_api_endpoints -- --nocapture' 2>&1
 else
   echo "error: neither 'cargo' nor 'docker' is available." >&2
   echo "  Install Rust: https://rustup.rs" >&2
