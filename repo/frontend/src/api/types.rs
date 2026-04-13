@@ -198,6 +198,49 @@ pub struct ErrorDetail {
     pub message: String,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn login_response_roundtrip() {
+        let v = LoginResponse {
+            token: "t".into(),
+            csrf_token: "c".into(),
+            user: MaskedUser {
+                id: "u1".into(),
+                username: "a".into(),
+                display_name: "Admin".into(),
+                role: "Administrator".into(),
+                store_id: None,
+            },
+        };
+        let json = serde_json::to_string(&v).unwrap();
+        let back: LoginResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.user.role, "Administrator");
+    }
+
+    #[test]
+    fn conflict_response_roundtrip() {
+        let v = ConflictResponse {
+            conflict: true,
+            reasons: vec![ConflictReasonDisplay {
+                code: "overlap".into(),
+                message: "Busy".into(),
+            }],
+            alternative_slots: vec![AlternativeSlot {
+                start_time: "2025-01-01T10:00:00Z".into(),
+                end_time: "2025-01-01T11:00:00Z".into(),
+            }],
+            alternate_assets: vec![],
+        };
+        let json = serde_json::to_string(&v).unwrap();
+        let back: ConflictResponse = serde_json::from_str(&json).unwrap();
+        assert!(back.conflict);
+        assert_eq!(back.reasons[0].code, "overlap");
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Upload {
     pub id: String,

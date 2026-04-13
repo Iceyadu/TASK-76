@@ -18,3 +18,31 @@ pub fn round_to_15_min(minutes: u32) -> u32 {
 pub fn is_within_business_hours(time: &str, start: &str, end: &str) -> bool {
     time >= start && time <= end
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_time_slots_respects_bounds_and_increment() {
+        let slots = generate_time_slots(9, 11, 30);
+        assert_eq!(slots, vec!["09:00", "09:30", "10:00", "10:30"]);
+    }
+
+    #[test]
+    fn round_to_15_min_nearest_boundary() {
+        assert_eq!(super::round_to_15_min(0), 0);
+        assert_eq!(super::round_to_15_min(7), 0);
+        assert_eq!(super::round_to_15_min(8), 15);
+        assert_eq!(super::round_to_15_min(22), 15);
+        assert_eq!(super::round_to_15_min(23), 30);
+        assert_eq!(super::round_to_15_min(38), 45);
+    }
+
+    #[test]
+    fn is_within_business_hours_lexicographic_for_hh_mm() {
+        assert!(is_within_business_hours("09:30", "09:00", "17:00"));
+        assert!(!is_within_business_hours("08:59", "09:00", "17:00"));
+        assert!(is_within_business_hours("17:00", "09:00", "17:00"));
+    }
+}

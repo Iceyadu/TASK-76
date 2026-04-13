@@ -57,19 +57,52 @@ impl AuthState {
     }
 
     pub fn has_role(&self, required: &str) -> bool {
-        let role_level = |r: &str| -> u8 {
-            match r {
-                "Customer" => 1,
-                "Photographer" => 2,
-                "MerchantStaff" => 3,
-                "PlatformOps" => 4,
-                "Administrator" => 5,
-                _ => 0,
-            }
-        };
-        match self.role.get() {
-            Some(r) => role_level(&r) >= role_level(required),
-            None => false,
-        }
+        satisfies_role(self.role.get().as_deref(), required)
+    }
+}
+
+/// Numeric rank for role-based access (higher = more privilege).
+pub fn role_rank(role: &str) -> u8 {
+    match role {
+        "Customer" => 1,
+        "Photographer" => 2,
+        "MerchantStaff" => 3,
+        "PlatformOps" => 4,
+        "Administrator" => 5,
+        _ => 0,
+    }
+}
+
+pub fn satisfies_role(current: Option<&str>, required: &str) -> bool {
+    match current {
+        Some(r) => role_rank(r) >= role_rank(required),
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_rank_ordering() {
+        assert!(role_rank("Administrator") > role_rank("PlatformOps"));
+        assert!(role_rank("PlatformOps") > role_rank("MerchantStaff"));
+        assert!(role_rank("MerchantStaff") > role_rank("Photographer"));
+        assert!(role_rank("Photographer") > role_rank("Customer"));
+    }
+
+    #[test]
+    fn satisfies_role_hierarchy() {
+        assert!(satisfies_role(Some("Administrator"), "Customer"));
+        assert!(satisfies_role(Some("MerchantStaff"), "MerchantStaff"));
+        assert!(!satisfies_role(Some("Customer"), "MerchantStaff"));
+        assert!(!satisfies_role(None, "Customer"));
+    }
+
+    #[test]
+    fn unknown_role_is_lowest() {
+        assert_eq!(role_rank("Nope"), 0);
+        assert!(!satisfies_role(Some("Nope"), "Customer"));
     }
 }

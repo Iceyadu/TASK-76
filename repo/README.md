@@ -53,21 +53,22 @@ trunk serve
 cargo test --lib
 cargo test --test integration_tests
 cargo test --test unit_tests_runner
-cargo test --test api_tests_runner
-cargo test --test http_api_endpoints
+cargo test --test api_tests_runner   # HTTP cases live in backend/tests/api/
+
+# Frontend (from repo/frontend): formatting, time helpers, role model, API types
+cd ../frontend && cargo test --lib
 ```
 
 ## Package Structure
 
 ```
 repo/
-  frontend/          Leptos WASM application
+  frontend/          Leptos WASM application (`cargo test --lib` for native unit tests)
   backend/           Axum REST API server
   docker-compose.yml Container orchestration
   run_tests.sh       Test runner
-  unit_tests/        Executable unit tests (wired via unit_tests_runner)
-  API_tests/         Executable API-level tests (services/auth; wired via api_tests_runner)
-                     plus HTTP integration tests: backend/tests/http_api_endpoints.rs
+  backend/tests/unit/   Focused unit tests (wired via `unit_tests_runner`)
+  backend/tests/api/    HTTP API route tests (axum-test; wired via `api_tests_runner`)
 ```
 
 ## Security Summary
