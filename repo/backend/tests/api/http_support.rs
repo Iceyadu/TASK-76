@@ -8,6 +8,11 @@ use tempfile::NamedTempFile;
 
 /// Known password for the seeded admin user (see `prepare_test_database`).
 pub const TEST_ADMIN_PASSWORD: &str = "FleetReserveHttpTest#2026";
+pub const TEST_ROLE_PASSWORD: &str = "FleetReserveRoleTest#2026";
+pub const TEST_CUSTOMER_USERNAME: &str = "customer1";
+pub const TEST_PHOTOGRAPHER_USERNAME: &str = "photo1";
+pub const TEST_MERCHANT_USERNAME: &str = "merchant1";
+pub const TEST_OPS_USERNAME: &str = "ops1";
 
 fn test_secrets() -> (String, String) {
     (
@@ -36,6 +41,20 @@ fn prepare_test_database(conn: &Connection) {
         [],
     )
     .expect("seed vehicle");
+    let role_hash = password::hash_password(TEST_ROLE_PASSWORD).expect("hash role password");
+    let seeded_users = [
+        ("user-customer-001", TEST_CUSTOMER_USERNAME, "Customer", Some("store-001")),
+        ("user-photo-001", TEST_PHOTOGRAPHER_USERNAME, "Photographer", Some("store-001")),
+        ("user-merchant-001", TEST_MERCHANT_USERNAME, "MerchantStaff", Some("store-001")),
+        ("user-ops-001", TEST_OPS_USERNAME, "PlatformOps", None),
+    ];
+    for (id, username, role, store_id) in seeded_users {
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, display_name, role, store_id, active) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1)",
+            rusqlite::params![id, username, &role_hash, username, role, store_id],
+        )
+        .expect("seed role user");
+    }
 }
 
 pub fn test_app_state() -> AppState {

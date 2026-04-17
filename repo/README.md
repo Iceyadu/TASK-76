@@ -1,126 +1,135 @@
+Project Type: fullstack
+
 # FleetReserve Operations Suite
 
-Offline vehicle fleet scheduling, e-ticket admissions, and auditable multi-role access for local rental yards and dealership service centers.
+Offline fleet scheduling + e-ticket check-in with role-aware operations, auditability, and backup/restore.
 
-## Architecture
-
-- **Frontend**: Leptos 0.6 (Rust -> WebAssembly), served via nginx
-- **Backend**: Axum 0.7 (Rust), REST API on port 3001
-- **Database**: SQLite (WAL mode) as on-device system of record
-- **Deployment**: Docker Compose
-
-```
-Browser (Leptos WASM) -> nginx:8080 -> Axum:3001 -> SQLite
-```
-
-## Prerequisites
-
-- Rust 1.77+ with `wasm32-unknown-unknown` target
-- trunk (`cargo install trunk`)
-- Docker and Docker Compose (for containerized deployment)
-
-## Quick Start (Docker)
+## Quick Start (Required Command)
 
 ```bash
-docker-compose up --build
+docker-compose up
 ```
 
-Access the application at http://localhost:8080
+Use `docker-compose up --build` for a fresh rebuild.
 
-Bootstrap admin account `admin` is seeded as disabled by default.
-Activate and reset credentials through your secure bootstrap process before first use.
+## Access
 
-## Quick Start (Development)
+- Frontend UI: [http://localhost:8081](http://localhost:8081)
+- Backend API (direct): [http://localhost:3001](http://localhost:3001)
 
-```bash
-# Terminal 1: Backend
-cd backend
-ENCRYPTION_KEY="dev-key-32-bytes-long-padding!!" \
-HMAC_SECRET="dev-hmac-secret-32-bytes-long!!" \
-cargo run
+## Auth and Demo Credentials
 
-# Terminal 2: Frontend
-cd frontend
-trunk serve
-```
+Authentication is required.
 
-## Running Tests
+| Role | Username | Password |
+|---|---|---|
+| Administrator | `admin` | `FleetReserveHttpTest#2026` |
+| PlatformOps | `ops1` | `FleetReserveRoleTest#2026` |
+| MerchantStaff | `merchant1` | `FleetReserveRoleTest#2026` |
+| Photographer | `photo1` | `FleetReserveRoleTest#2026` |
+| Customer | `customer1` | `FleetReserveRoleTest#2026` |
+
+### Bootstrap / reset process
+
+If admin credentials were changed in your environment, use API/UI bootstrap only:
+
+1. Start stack (`docker-compose up`).
+2. Sign in with current admin credentials if available.
+3. If sign-in fails, use the recovery-code reset flow:
+   - issue code via `POST /api/admin/recovery-codes` from an existing admin session
+   - reset via `POST /api/auth/reset-password`
+4. Confirm new credentials by logging in at `http://localhost:8081/login`.
+
+## Startup Verification (Concrete)
+
+1. `docker-compose ps` must show `backend` and `frontend` as `Up`.
+2. `curl -s http://localhost:3001/api/auth/login -H "content-type: application/json" -d '{"username":"admin","password":"FleetReserveHttpTest#2026"}'`
+   - expected: HTTP `200` with `token` and `csrf_token` fields.
+3. Open `http://localhost:8081/login` and sign in using the same admin credentials.
+
+## Test Execution
 
 ```bash
 ./run_tests.sh
-
-# Or individually (from repo/backend):
-cargo test --lib
-cargo test --test integration_tests
-cargo test --test unit_tests_runner
-cargo test --test api_tests_runner   # HTTP cases live in backend/tests/api/
-
-# Frontend (from repo/frontend): formatting, time helpers, role model, API types
-cd ../frontend && cargo test --lib
 ```
 
-## Package Structure
+`run_tests.sh` is Docker-only and runs backend + frontend suites.
 
-```
-repo/
-  frontend/          Leptos WASM application (`cargo test --lib` for native unit tests)
-  backend/           Axum REST API server
-  docker-compose.yml Container orchestration
-  run_tests.sh       Test runner
-  backend/tests/unit/   Focused unit tests (wired via `unit_tests_runner`)
-  backend/tests/api/    HTTP API route tests (axum-test; wired via `api_tests_runner`)
-```
+### Successful output indicators
 
-## Security Summary
+- Script ends with `=== All available tests complete ===`
+- No `FAILED` test blocks in output
+- Docker run exits with code `0`
 
-| Feature | Implementation |
-|---------|---------------|
-| Password hashing | Argon2id (19 MiB, 2 iterations) |
-| Session tokens | HMAC-SHA256 signed, 12-hour idle timeout |
-| CSRF protection | Random token per session, required on POST/PUT/DELETE |
-| XSS prevention | Leptos auto-escaping, Content-Security-Policy |
-| Encryption at rest | AES-256-GCM for VIN, license plate, email |
-| Data masking | VIN last 4, plate last 2, username first char only |
-| Audit trail | Append-only SHA-256 hash chain with periodic anchors |
-| Upload validation | Magic bytes + MIME sniff + size limit + SHA-256 dedup |
-| Authorization | Route-level + object-level + store isolation |
+### Failure interpretation
 
-## Role Model
+- `Cannot connect to the Docker daemon`: Docker service not running
+- Rust compile/test failure output: test or code regression; inspect preceding `error:` blocks
+- Non-zero exit from script: at least one suite failed
 
-| Role | Access Scope |
-|------|-------------|
-| Customer | Own reservations and tickets |
-| Photographer | Assigned jobs only |
-| Merchant/Store Staff | Own store fleet, reservations, check-in |
-| Platform Operations | Cross-store calendars, exports, audit |
-| Administrator | All + user/role management, backup/restore |
+## Backend API Inventory
 
-## API Overview
+All routes are under `/api`.
 
-All endpoints are under `/api/`.
+### Public
+- `POST /api/auth/login`
+- `POST /api/auth/reset-password`
 
-- `POST /api/auth/login` - Authenticate
-- `GET /api/calendar` - Availability calendar (day/week, 15-min increments)
-- `POST /api/reservations` - Create reservation with conflict detection
-- `POST /api/tickets/:id/redeem` - Redeem ticket (blocks re-entry)
-- `POST /api/tickets/:id/undo` - Supervised undo (2-min window, reason required)
-- `PUT /api/vehicles/:id/status` - Status transition (permission-gated)
-- `POST /api/uploads` - Photo upload (JPEG/PNG, magic byte validation)
+### Authenticated (`require_auth`)
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `POST /api/reservations`
+- `GET /api/reservations`
+- `GET /api/tickets/:id`
+- `GET /api/assignments`
 
-## Known Limitations
+### Staff+ (`require_staff`)
+- `GET /api/vehicles`
+- `GET /api/vehicles/:id`
+- `POST /api/vehicles`
+- `PUT /api/vehicles/:id/status`
+- `GET /api/bays`
+- `POST /api/bays`
+- `GET /api/stores`
+- `GET /api/calendar`
+- `POST /api/tickets/:id/redeem`
+- `POST /api/tickets/:id/undo`
+- `POST /api/uploads`
+- `POST /api/assignments`
 
-1. Ticket QR rendering is deterministic SVG and not a standards-compliant QR encoder
-2. SQLite provides limited concurrent write throughput compared to PostgreSQL
-3. File upload content stripping is simplified (strips EXIF APP segments for JPEG)
-4. Session tokens are stored in browser memory (cleared on page refresh)
-5. Backup encryption uses the system key; key escrow is the admin's responsibility
+### PlatformOps+ (`require_ops`)
+- `GET /api/exports`
+- `GET /api/audit`
 
-## Manual Verification Required
+### Administrator (`require_admin`)
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+- `GET /api/admin/permissions`
+- `POST /api/admin/permissions`
+- `POST /api/admin/permissions/:id`
+- `PUT /api/admin/users/:id/role`
+- `PUT /api/admin/users/:id/active`
+- `POST /api/admin/recovery-codes`
+- `POST /api/backup`
+- `POST /api/backup/restore`
 
-1. True concurrent reservation creation under load
-2. QR code camera scanning in browser
-3. Docker build and deployment
-4. Full backup/restore cycle
-5. Browser rendering of calendar and ticket views
-6. 12-hour idle session timeout in real-time
-7. Nginx reverse proxy configuration in Docker
+## UI Verification Flow (End-to-End)
+
+1. Login as `admin` in UI.
+2. Vehicles: verify list renders, create vehicle, update status.
+3. Reservations: create reservation and confirm ticket output.
+4. Check-in (`/checkin`): redeem then undo a ticket.
+5. Admin: list users, issue recovery code, create and restore backup.
+6. Role checks: sign in as `customer1`, `photo1`, `merchant1`, `ops1` and verify forbidden/allowed screens.
+
+## Manual Verifications with Observable Output
+
+1. Concurrency contention:
+   - run two parallel reservation creates for same asset/time
+   - expected: one `201`, one `409 conflict`
+2. QR camera scan:
+   - scan generated ticket at `/checkin`
+   - expected: `SUCCESS: Ticket redeemed successfully!`
+3. Backup/restore:
+   - create backup in Admin page
+   - expected: success message + encrypted `.enc` file under mounted backup path

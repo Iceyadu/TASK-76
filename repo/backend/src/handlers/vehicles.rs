@@ -73,8 +73,10 @@ pub async fn get_vehicle(
         }
     }
 
-    let vin = encryption::decrypt_field(&v.vin_encrypted, &state.encryption_key).unwrap_or_default();
-    let plate = encryption::decrypt_field(&v.license_plate_encrypted, &state.encryption_key).unwrap_or_default();
+    let vin = encryption::decrypt_field(&v.vin_encrypted, &state.encryption_key)
+        .unwrap_or_else(|_| "DECRYPTION_ERROR".to_string());
+    let plate = encryption::decrypt_field(&v.license_plate_encrypted, &state.encryption_key)
+        .unwrap_or_else(|_| "DECRYPTION_ERROR".to_string());
 
     Ok(Json(MaskedVehicle {
         id: v.id, vin: masking::mask_vin(&vin), license_plate: masking::mask_license_plate(&plate),
